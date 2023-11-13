@@ -1,0 +1,38 @@
+---
+title: "MIVI"
+author: "Will Bennett"
+date: "10/5/2023"
+output: html_document
+---
+
+# Japanese Stiltgrass (Microstegium vimineum)
+# Effects of Latitude and Elevation on Seeding Time
+
+Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>
+Total observations (NA): 14720<br/>
+Observations needing phenology annotation: 12498<br/>
+
+```{R}
+library(ggplot2)
+# library(maps)
+
+data <- data.frame("category" = c('Annotated', 'Not Annotated'), "amount" = c(2952, 12066))
+ggplot(data, aes(x="", y=amount, fill=category)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)
+```
+
+
+```{R}
+
+mivi_young <- read.csv("./MIVI-YOUNG.csv")  # 1346
+mivi_flowering <- read.csv("./MIVI-FLOWERING.csv")  # 22
+mivi_fruiting <- read.csv("./MIVI-FRUITING.csv")  # 258
+
+head(mivi_young)
+
+ggplot(mivi_young, aes(x=longitude,y=latitude)) + geom_point()
+# ggplot(mivi_young, aes(x=longitude,y=latitude,color=place_state_name)) + geom_point()
+
+ggplot(mivi_young, aes(x=latitude)) + geom_histogram(binwidth=0.2)
+```
