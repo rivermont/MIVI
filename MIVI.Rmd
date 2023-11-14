@@ -32,7 +32,7 @@ mivi_fruiting <- read.csv("./MIVI-FRUITING.csv")  # 258
 head(mivi_young)
 
 ggplot(mivi_young, aes(x=longitude,y=latitude)) + geom_point()
-# ggplot(mivi_young, aes(x=longitude,y=latitude,color=place_state_name)) + geom_point()
+ggplot(mivi_young, aes(x=longitude,y=latitude,color=place_state_name)) + geom_point()
 
 ggplot(mivi_young, aes(x=latitude)) + geom_histogram(binwidth=0.2)
 ```
