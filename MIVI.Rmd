@@ -8,13 +8,13 @@ output: pdf_document
 # Japanese Stiltgrass (Microstegium vimineum)
 # Effects of Latitude and Elevation on Seeding Time
 
-Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>
-Total observations (NA): 15040<br/>
-Observations needing phenology annotation: 11010<br/>
+Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
+Total observations (NA): 15040<br/>  
+Observations needing phenology annotation: 11010
 
 ### Setup
 
-```{R}
+```{R, message=FALSE}
 # set lwd
 setwd("~/Documents/MIVI/")
 
@@ -43,9 +43,11 @@ n = 60
 2. Export all _M. vimineum_ observations with phenology 'Fruiting' with column `id`:
 [Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=14)
 
-NOTE: term_value=15 is flower budding
+<!--
+Note: `?term_value=15` is flower budding
+-->
 
-```{R}
+```{R, eval=FALSE}
 # 1
 mivi_all <- read.csv("./MIVI-ALL.csv") %>%
     mutate(date=as.Date(observed_on, format="%Y-%m-%d")) %>% select(-observed_on) %>%
@@ -75,16 +77,17 @@ mivi_all <- mivi_all %>% left_join(mivi_fruiting, by="id") %>%
 rm(mivi_young, mivi_flowering, mivi_fruiting)
 ```
 
-### Load from processed file
+### Or load from processed file
 
 ```{R}
-mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X)
+mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X) %>%
+    mutate(date=as.Date(date, format="%Y-%m-%d"))
 ```
 
 ## Data processing
 
-TODO: remove known problem records:
-130398055 - not flowering,
+Todo: remove known problem records<br/>  
+130398055 - not flowering,<br/>  
 32815927 - not flowering
 
 ```{R}
@@ -92,7 +95,8 @@ TODO: remove known problem records:
 mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j")))
 
 # make phenology a factor type (not necessary)
-mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE, levels=c("Vegetation", "Flowering", "Seeding"))
+mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE,
+                         levels=c("Vegetation", "Flowering", "Seeding"))
 
 # Select only observations with phenology data
 mivi_annotated <- mivi_all %>% filter(!is.na(stage))
@@ -130,8 +134,9 @@ ggplot(mivi_annotated, aes(julian, stage)) + geom_boxplot() + facet_grid(~group)
 ## Time Series Plots
 ```{R}
 # Latitude against Julian day
-ggplot(mivi_annotated, aes(julian, latitude)) + geom_point(aes(color=stage), alpha=0.5) + scale_color_hue() +
-    xlab("Julian day") + labs(title="Annotated Observations by Latitude and Julian Day")
+ggplot(mivi_annotated, aes(julian, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
+    scale_color_hue() + xlab("Julian day") +
+    labs(title="Annotated Observations by Latitude and Julian Day")
 
 # Time series by latitude, color by stage
 ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
@@ -148,14 +153,16 @@ ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) 
 
 # Retrieve Elevation Information
 
-```{R}
-coords <- data.frame(x=mivi_annotate$longitude, y=mivi_annotate$latitude, ele_id=mivi_annotate$id) # %>% slice(1:100)
-# use slice() to get a subset for reducing retrieval time
+```{R, eval=FALSE}
+coords <- data.frame(x=mivi_annotate$longitude,
+                     y=mivi_annotate$latitude, ele_id=mivi_annotate$id)
+# use slice(1:100) to get a subset for reducing retrieval time
 
 # retrieve elevation from USGS (takes a while)
 elevations <- get_elev_point(coords, prj=4326, src="epqs")
 
-mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>% select(-elev_units, -geometry)
+mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
+    select(-elev_units, -geometry)
 rm(elevations)
 
 
@@ -168,8 +175,8 @@ write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 ```{R}
 # Note: returns Inf if there are none in the selection
 first_seed <- function(df) {
-  df <- df %>% filter(stage == "Seeding")
-  return (min(df$julian, na.rm=TRUE))
+    df <- df %>% filter(stage == "Seeding")
+    return (min(df$julian, na.rm=TRUE))
 }
 ```
 
@@ -193,14 +200,15 @@ ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
     ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
 
 # Q-Q residual plot
-model_ele <- lm(fseed~lat, data=a)
+model_lat <- lm(fseed~mlat, data=a)
+res <- resid(model_lat)
 qqnorm(res)
 qqline(res)
 
 # Pearson's correlation test
 cor.test(a$fseed, a$mlat, alternative="less")
 
-rm(a, b)
+rm(a, b, res)
 ```
 
 ## Elevation
@@ -224,14 +232,32 @@ ggplot(a, aes(mele, fseed)) + geom_point() + geom_smooth(method='lm') +
 
 # Q-Q residual plot
 model_ele <- lm(fseed~mele, data=a)
+res <- resid(model_ele)
 qqnorm(res)
 qqline(res)
 
 # Pearson's correlation test
 cor.test(a$fseed, a$mele, alternative="less")
 
-rm(a, b)
+rm(a, b, res)
 ```
+
+<!--
+## Results with different group sizes
+
+```{R, eval=FALSE}
+row_names <- c('Number of Groups', 'Lat corr', 'Lat pv', 'Ele corr', 'Ele pv')
+lat_corrs <- c(0)
+lat_pvs <- c(0)
+ele_corrs <- c(0)
+ele_pvs <- (0)
+
+df <- data.frame(lat_corrs, lat_pvs, ele_corrs, ele_pvs)
+table(df)
+format_table(df)
+export_table(df)
+```
+-->
 
 
 <!--
