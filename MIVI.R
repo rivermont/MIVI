@@ -4,7 +4,6 @@ setwd("~/Documents/MIVI/")
 library(ggplot2)
 library(dplyr)
 
-# 
 
 # download all Mv: id, observed_on, lat, lon, state, country
 # quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true
@@ -51,7 +50,7 @@ timeclip <- c(min(mivi_all$date), max(mivi_all$date))
 
 # Time series by latitude, color by stage
 ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.75) +
-  scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y")  + # scale_color_hue() # +
+  scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y") + scale_color_hue() +
   labs(title="Observations by latitude over time")
 
 
@@ -69,9 +68,9 @@ mivi_annotate$group <- ntile(mivi_annotate$elevation, 50)
 
 mivi_annotate <- mivi_all %>% filter(!is.na(stage))
 
-# ggplot(mivi_annotate, aes(yearweek, stage)) + geom_boxplot() + coord_flip() +
-#   facet_grid(~group) # +
-#   # scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y")
+ggplot(mivi_all, aes(julian, stage)) + geom_boxplot() + coord_flip() +
+ facet_grid(~group) # +
+ # scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y")
 
 # grouped plots by julian date
 # TODO: relabel x axis with dates
@@ -101,23 +100,6 @@ ggplot(mivi_all, aes(julian, elevation)) + geom_point(aes(color=stage))
 
 # Save file
 write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
-
-
-
-P40 <- createPalette(52, c("#FF0000", "#00FF00", "#0000FF"), range = c(30, 80))
-swatch(P40)
-P40 <- sortByHue(P40)
-P40 <- as.vector(t(matrix(P40, ncol=4)))
-names(P40) <- NULL
-
-ggplot(mivi_e, aes(longitude, latitude)) + geom_point(aes(color=factor(group_e)), alpha = 1, show.legend=FALSE) + scale_color_manual(values=P40)
-
-mivi_e <- mivi_all %>% filter(!is.na(elevation))
-
-mivi_all$group_e <- ntile(mivi_all$elevation, 50)
-
-ggplot(mivi_e, aes(julian, elevation)) + geom_point(aes(color=stage), alpha=0.7) + facet_grid(rows=vars(group_e)) + scale_color_brewer(palette="Set2") +
-  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), panel.grid.major.y=element_blank(), panel.grid.minor.y=element_blank(), panel.spacing.y=unit(1, "mm"))
 
 
 ######
@@ -150,6 +132,7 @@ a <- remove_missing(a, finite=TRUE)
 
 ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm')
 
+cor.test(a$fseed, a$mlat, alternative="less")
 
 ## ELE
 
@@ -164,6 +147,7 @@ a <- remove_missing(a, finite=TRUE)
 
 ggplot(a, aes(mele, fseed)) + geom_point() + geom_smooth(method='lm')
 
+cor.test(a$fseed, a$mele, alternative="less")
 
 ####
 

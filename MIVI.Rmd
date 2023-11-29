@@ -1,38 +1,242 @@
 ---
 title: "MIVI"
 author: "Will Bennett"
-date: "10/5/2023"
-output: html_document
+date: "11/28/2023"
+output: pdf_document
 ---
 
 # Japanese Stiltgrass (Microstegium vimineum)
 # Effects of Latitude and Elevation on Seeding Time
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>
-Total observations (NA): 14720<br/>
-Observations needing phenology annotation: 12498<br/>
+Total observations (NA): 15040<br/>
+Observations needing phenology annotation: 11010<br/>
+
+### Setup
 
 ```{R}
-library(ggplot2)
-# library(maps)
+# set lwd
+setwd("~/Documents/MIVI/")
 
+library(dplyr)
+library(ggplot2)
+library(elevatr)
+
+# number of groups for analysis
+n = 60
+```
+
+
+# Loading data
+
+## Export iNaturalist Data
+
+1. Export all _Microstegium vimineum_ observations from iNat with columns (`id`, `observed_on`, `latitude`, `longitude`, `place_state_name`, `place_country_name`):
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true)
+
+2. Export all _M. vimineum_ observations with phenology 'No Evidence of Flowering' with column `id`:
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=21)
+
+2. Export all _M. vimineum_ observations with phenology 'Flowering' with column `id`:
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=13)
+
+2. Export all _M. vimineum_ observations with phenology 'Fruiting' with column `id`:
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=14)
+
+NOTE: term_value=15 is flower budding
+
+```{R}
+# 1
+mivi_all <- read.csv("./MIVI-ALL.csv") %>%
+    mutate(date=as.Date(observed_on, format="%Y-%m-%d")) %>% select(-observed_on) %>%
+    select(-place_country_name)  # not really useful
+
+# 2
+mivi_young <- read.csv("MIVI-YOUNG.csv") %>%
+    mutate(stage="Vegetation")
+
+# 3
+mivi_flowering <- read.csv("./MIVI-FLOWERING.csv") %>%
+    mutate(stage="Flowering")
+
+# 4
+mivi_fruiting <- read.csv("./MIVI-FRUITING.csv") %>%
+    mutate(stage="Seeding")
+
+
+# join each based on id
+mivi_all <- mivi_all %>% left_join(mivi_young, by="id")
+mivi_all <- mivi_all %>% left_join(mivi_flowering, by="id") %>%
+    mutate(stage = coalesce(stage.x, stage.y)) %>% select(-stage.x, -stage.y)
+mivi_all <- mivi_all %>% left_join(mivi_fruiting, by="id") %>%
+    mutate(stage = coalesce(stage.x, stage.y)) %>% select(-stage.x, -stage.y)
+
+# memory cleanup
+rm(mivi_young, mivi_flowering, mivi_fruiting)
+```
+
+### Load from processed file
+
+```{R}
+mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X)
+```
+
+## Data processing
+
+TODO: remove known problem records:
+130398055 - not flowering,
+32815927 - not flowering
+
+```{R}
+# Get Julian day
+mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j")))
+
+# make phenology a factor type (not necessary)
+mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE, levels=c("Vegetation", "Flowering", "Seeding"))
+
+# Select only observations with phenology data
+mivi_annotated <- mivi_all %>% filter(!is.na(stage))
+
+# Group into quartiles by latitude
+mivi_annotated$group <- ntile(mivi_annotated$latitude, 4)
+```
+
+
+# Basic Descriptive Plots
+
+```{R}
+# Density of all observations by lat/lon
+ggplot(mivi_all, aes(x=longitude,y=latitude)) + geom_point(alpha=0.25) +
+    labs(title="Density of observations by location")
+
+# Histogram of all observations by lat
+ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
+    labs(title="Histogram of observations by latitude")
+
+# Histogram with city labels
+ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
+    geom_vline(xintercept=33.75) + annotate("text", x=33.5, y=850, label="Atlanta", angle=90) +
+    geom_vline(xintercept=35.84) + annotate("text", x=35.59, y=850, label="Raleigh", angle=90) +
+    geom_vline(xintercept=38.9) + annotate("text", x=38.65, y=850, label="Washington", angle=90) +
+    geom_vline(xintercept=40.75) + annotate("text", x=41, y=850, label="New York", angle=90) +
+    ylab("count") + labs(title="Histogram of observations by latitude")
+
+# Boxplots of phenology by quartile
+# Slight earlier trend in Seeding visible
+ggplot(mivi_annotated, aes(julian, stage)) + geom_boxplot() + facet_grid(~group) +
+    coord_flip() + xlab("Julian day") + labs(title="Phenology stage, quartiles by latitude")
+```
+
+## Time Series Plots
+```{R}
+# Latitude against Julian day
+ggplot(mivi_annotated, aes(julian, latitude)) + geom_point(aes(color=stage), alpha=0.5) + scale_color_hue() +
+    xlab("Julian day") + labs(title="Annotated Observations by Latitude and Julian Day")
+
+# Time series by latitude, color by stage
+ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
+    scale_x_date(date_breaks = "1 year", date_labels = "%Y") + scale_color_hue() +
+    labs(title="Observations by latitude over time")
+
+# Zoom in on recent data
+timeclip <- c(as.Date("2019-02-01"), as.Date("2023-11-30"))
+ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
+    scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y") + scale_color_hue() +
+    labs(title="Observations by latitude over time (2019-2023)")
+```
+
+
+# Retrieve Elevation Information
+
+```{R}
+coords <- data.frame(x=mivi_annotate$longitude, y=mivi_annotate$latitude, ele_id=mivi_annotate$id) # %>% slice(1:100)
+# use slice() to get a subset for reducing retrieval time
+
+# retrieve elevation from USGS (takes a while)
+elevations <- get_elev_point(coords, prj=4326, src="epqs")
+
+mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>% select(-elev_units, -geometry)
+rm(elevations)
+
+
+write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
+```
+
+
+# Analysis!
+
+```{R}
+# Note: returns Inf if there are none in the selection
+first_seed <- function(df) {
+  df <- df %>% filter(stage == "Seeding")
+  return (min(df$julian, na.rm=TRUE))
+}
+```
+
+## Latitude
+
+```{R}
+# Create groups
+mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
+
+# mean lat for each group
+a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE))
+
+# first seeding date in each group
+b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
+
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...3) %>% select(-...3)
+a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+
+# Plot with linear model
+ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
+    ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
+
+# Q-Q residual plot
+model_ele <- lm(fseed~lat, data=a)
+qqnorm(res)
+qqline(res)
+
+# Pearson's correlation test
+cor.test(a$fseed, a$mlat, alternative="less")
+
+rm(a, b)
+```
+
+## Elevation
+
+```{R}
+# Create groups
+mivi_annotated$group <- ntile(mivi_annotated$elevation, n)
+
+# mean lat for each group
+a <- mivi_annotated %>% group_by(group) %>% summarise(mele=mean(elevation, na.rm=TRUE))
+
+# first seeding date in each group
+b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
+
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...3) %>% select(-...3)
+a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+
+# Plot with linear model
+ggplot(a, aes(mele, fseed)) + geom_point() + geom_smooth(method='lm') +
+    ylab("Julian day") + xlab("mean elevation") + labs(title="First Seeding Day by Elevation")
+
+# Q-Q residual plot
+model_ele <- lm(fseed~mele, data=a)
+qqnorm(res)
+qqline(res)
+
+# Pearson's correlation test
+cor.test(a$fseed, a$mele, alternative="less")
+
+rm(a, b)
+```
+
+
+<!--
 data <- data.frame("category" = c('Annotated', 'Not Annotated'), "amount" = c(2952, 12066))
 ggplot(data, aes(x="", y=amount, fill=category)) +
-  geom_bar(stat="identity", width=1) +
-  coord_polar("y", start=0)
-```
-
-
-```{R}
-
-mivi_young <- read.csv("./MIVI-YOUNG.csv")  # 1346
-mivi_flowering <- read.csv("./MIVI-FLOWERING.csv")  # 22
-mivi_fruiting <- read.csv("./MIVI-FRUITING.csv")  # 258
-
-head(mivi_young)
-
-ggplot(mivi_young, aes(x=longitude,y=latitude)) + geom_point()
-ggplot(mivi_young, aes(x=longitude,y=latitude,color=place_state_name)) + geom_point()
-
-ggplot(mivi_young, aes(x=latitude)) + geom_histogram(binwidth=0.2)
-```
+    geom_bar(stat="identity", width=1) +
+    coord_polar("y", start=0)
+-->
