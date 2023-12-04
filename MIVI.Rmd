@@ -22,9 +22,11 @@ library(dplyr)
 library(ggplot2)
 library(elevatr)
 library(corrtable)
+library(table1)
+library(knitr)
 
 # number of groups for analysis
-n = 60
+n = 200
 ```
 
 
@@ -140,6 +142,11 @@ ggplot(mivi_annotated, aes(julian, latitude)) + geom_point(aes(color=stage), alp
     scale_color_hue() + xlab("Julian day") +
     labs(title="Annotated Observations by Latitude and Julian Day")
 
+# Latitude against Julian day
+# ggplot(mivi_all, aes(julian, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
+#     scale_color_hue() + xlab("Julian day") +
+#     labs(title="Observations by Latitude and Julian Day")
+
 # Time series by latitude, color by stage
 ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
     scale_x_date(date_breaks = "1 year", date_labels = "%Y") + scale_color_hue() +
@@ -216,8 +223,10 @@ print(mad(res))
 cor.test(a$fseed, a$mlat, alternative="less")
 
 correlation_matrix(a, use="lower")
+# correlation_matrix(a, use="lower")$estimate
 
 # kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
+kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
 
 rm(a, b, res)
 ```
@@ -252,6 +261,13 @@ cor.test(a$fseed, a$mele, alternative="less")
 
 rm(a, b, res)
 ```
+
+## Tables
+
+```{R}
+table1(~ latitude + longitude + elevation + julian | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
+```
+
 
 <!--
 ## Results with different group sizes
