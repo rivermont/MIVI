@@ -1,7 +1,7 @@
 ---
 title: "MIVI"
 author: "Will Bennett"
-date: "11/28/2023"
+date: "12/02/2023"
 output: pdf_document
 ---
 
@@ -21,6 +21,7 @@ setwd("~/Documents/MIVI/")
 library(dplyr)
 library(ggplot2)
 library(elevatr)
+library(corrtable)
 
 # number of groups for analysis
 n = 60
@@ -33,6 +34,7 @@ n = 60
 
 1. Export all _Microstegium vimineum_ observations from iNat with columns (`id`, `observed_on`, `latitude`, `longitude`, `place_state_name`, `place_country_name`):
 [Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true)
+<!-- quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000 -->
 
 2. Export all _M. vimineum_ observations with phenology 'No Evidence of Flowering' with column `id`:
 [Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=21)
@@ -154,17 +156,19 @@ ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) 
 # Retrieve Elevation Information
 
 ```{R, eval=FALSE}
-coords <- data.frame(x=mivi_annotate$longitude,
-                     y=mivi_annotate$latitude, ele_id=mivi_annotate$id)
-# use slice(1:100) to get a subset for reducing retrieval time
+# TODO: replace elevation value with value from 'field:elevation (feet)'
+
+coords <- data.frame(x=mivi_annotated$longitude,
+                     y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
+# pipe to 'slice(1:100)' to get a subset for reducing retrieval time
 
 # retrieve elevation from USGS (takes a while)
 elevations <- get_elev_point(coords, prj=4326, src="epqs")
 
 mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
     select(-elev_units, -geometry)
-rm(elevations)
 
+rm(coords, elevations)
 
 write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 ```
@@ -187,12 +191,12 @@ first_seed <- function(df) {
 mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
 
 # mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE))
+a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
 
 # first seeding date in each group
 b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
 
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...3) %>% select(-...3)
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
 a <- remove_missing(a, finite=TRUE)  # remove any Inf's
 
 # Plot with linear model
@@ -205,8 +209,15 @@ res <- resid(model_lat)
 qqnorm(res)
 qqline(res)
 
+print(n)
+print(mad(res))
+
 # Pearson's correlation test
 cor.test(a$fseed, a$mlat, alternative="less")
+
+correlation_matrix(a, use="lower")
+
+# kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
 
 rm(a, b, res)
 ```
