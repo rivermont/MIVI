@@ -9,8 +9,8 @@ output: pdf_document
 # Effects of Latitude and Elevation on Seeding Time
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
-Total observations (NA): 15040<br/>  
-Observations needing phenology annotation: 11010
+Total observations (NA): 14,992<br/>  
+Observations needing phenology annotation: 8,624
 
 ### Setup
 
@@ -26,7 +26,7 @@ library(table1)
 library(knitr)
 
 # number of groups for analysis
-n = 200
+n = 180
 ```
 
 
@@ -35,17 +35,17 @@ n = 200
 ## Export iNaturalist Data
 
 1. Export all _Microstegium vimineum_ observations from iNat with columns (`id`, `observed_on`, `latitude`, `longitude`, `place_state_name`, `place_country_name`):
-[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true)
-<!-- quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000 -->
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000)
+<!--  -->
 
 2. Export all _M. vimineum_ observations with phenology 'No Evidence of Flowering' with column `id`:
-[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=21)
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=21)
 
 2. Export all _M. vimineum_ observations with phenology 'Flowering' with column `id`:
-[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=13)
+[Link](https://www.inaturalist.org/observations/quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=13)
 
 2. Export all _M. vimineum_ observations with phenology 'Fruiting' with column `id`:
-[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&place_id=97394&taxon_id=116710&verifiable=true&term_id=12&term_value_id=14)
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=14)
 
 <!--
 Note: `?term_value=15` is flower budding
@@ -55,7 +55,7 @@ Note: `?term_value=15` is flower budding
 # 1
 mivi_all <- read.csv("./MIVI-ALL.csv") %>%
     mutate(date=as.Date(observed_on, format="%Y-%m-%d")) %>% select(-observed_on) # %>%
-    # select(-place_country_name)  # not really useful
+    # select(-place_country_name)
 
 # 2
 mivi_young <- read.csv("MIVI-YOUNG.csv") %>%
@@ -90,11 +90,10 @@ mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X) %>%
 
 ## Data processing
 
-Todo: remove known problem records<br/>  
-130398055 - not flowering,<br/>  
-32815927 - not flowering
-
 ```{R}
+# remove known incorrect records
+mivi_all <- subset(mivi_all, id != "130398055")
+
 # Get Julian day
 mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j")))
 
@@ -129,7 +128,7 @@ ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
     geom_vline(xintercept=40.75) + annotate("text", x=41, y=850, label="New York", angle=90) +
     ylab("count") + labs(title="Histogram of observations by latitude")
 
-# Boxplots of phenology by quartile
+# Boxplots of phenology by quartile (notches break hinges for Flowering)
 # Slight earlier trend in Seeding visible
 ggplot(mivi_annotated, aes(julian, stage)) + geom_boxplot() + facet_grid(~group) +
     coord_flip() + xlab("Julian day") + labs(title="Phenology stage, quartiles by latitude")
@@ -194,41 +193,45 @@ first_seed <- function(df) {
 ## Latitude
 
 ```{R}
-# Create groups
-mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
+latitude_models <- function(df, nt) {
+    # Create groups
+    df$group <- ntile(df$latitude, n)
+    
+    # mean lat for each group
+    a <- df %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
+    
+    # first seeding date in each group
+    b <- df %>% group_by(group) %>% group_map(~first_seed(.x))
+    
+    a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
+    a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+    
+    # Plot with linear model
+    print(
+        ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
+            ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
+    )
+    
+    # Q-Q residual plot
+    model_lat <- lm(fseed~mlat, data=a)
+    res <- resid(model_lat)
+    qqnorm(res)
+    qqline(res)
+    
+    print(n)
+    print(mad(res))
+    
+    # Pearson's correlation test
+    cor.test(a$fseed, a$mlat, alternative="less")
+    
+    correlation_matrix(a, use="lower")
+    # correlation_matrix(a, use="lower")$estimate
+    
+    # kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
+    kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
+}
 
-# mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
-
-# first seeding date in each group
-b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
-
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
-a <- remove_missing(a, finite=TRUE)  # remove any Inf's
-
-# Plot with linear model
-ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
-    ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
-
-# Q-Q residual plot
-model_lat <- lm(fseed~mlat, data=a)
-res <- resid(model_lat)
-qqnorm(res)
-qqline(res)
-
-print(n)
-print(mad(res))
-
-# Pearson's correlation test
-cor.test(a$fseed, a$mlat, alternative="less")
-
-correlation_matrix(a, use="lower")
-# correlation_matrix(a, use="lower")$estimate
-
-# kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
-kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
-
-rm(a, b, res)
+latitude_models(mivi_annotated, n)
 ```
 
 ## Elevation
@@ -268,7 +271,7 @@ rm(a, b, res)
 # All observations by country
 table1(~ place_country_name, data=mivi_all %>% mutate(stage=addNA(stage)))
 
-table1(~ latitude + longitude + elevation + julian | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
+table1(~ latitude + longitude + elevation + julian + place_country_name | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
 ```
 
 
