@@ -10,7 +10,7 @@ output: pdf_document
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
 Total observations (NA): 14,992<br/>  
-Observations needing phenology annotation: 8,624
+Observations needing phenology annotation: 8,316
 
 ### Setup
 
@@ -193,45 +193,43 @@ first_seed <- function(df) {
 ## Latitude
 
 ```{R}
-latitude_models <- function(df, nt) {
-    # Create groups
-    df$group <- ntile(df$latitude, n)
-    
-    # mean lat for each group
-    a <- df %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
-    
-    # first seeding date in each group
-    b <- df %>% group_by(group) %>% group_map(~first_seed(.x))
-    
-    a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
-    a <- remove_missing(a, finite=TRUE)  # remove any Inf's
-    
-    # Plot with linear model
-    print(
-        ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
-            ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
-    )
-    
-    # Q-Q residual plot
-    model_lat <- lm(fseed~mlat, data=a)
-    res <- resid(model_lat)
-    qqnorm(res)
-    qqline(res)
-    
-    print(n)
-    print(mad(res))
-    
-    # Pearson's correlation test
-    cor.test(a$fseed, a$mlat, alternative="less")
-    
-    correlation_matrix(a, use="lower")
-    # correlation_matrix(a, use="lower")$estimate
-    
-    # kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
-    kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
-}
+# Create groups
+mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
 
-latitude_models(mivi_annotated, n)
+# mean lat for each group
+a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
+
+# first seeding date in each group
+b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
+
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
+a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+
+# Plot with linear model
+print(
+    ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
+        ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
+)
+
+# Q-Q residual plot
+model_lat <- lm(fseed~mlat, data=a)
+res <- resid(model_lat)
+qqnorm(res)
+qqline(res)
+
+print(n)
+print(mad(res))
+
+# Pearson's correlation test
+cor.test(a$fseed, a$mlat, alternative="less")
+
+correlation_matrix(a, use="lower")
+# correlation_matrix(a, use="lower")$estimate
+
+# kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
+# kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
+
+rm(a, b, res, model_lat)
 ```
 
 ## Elevation
@@ -262,7 +260,7 @@ qqline(res)
 # Pearson's correlation test
 cor.test(a$fseed, a$mele, alternative="less")
 
-rm(a, b, res)
+rm(a, b, res, model_ele)
 ```
 
 ## Tables
