@@ -54,8 +54,8 @@ Note: `?term_value=15` is flower budding
 ```{R, eval=FALSE}
 # 1
 mivi_all <- read.csv("./MIVI-ALL.csv") %>%
-    mutate(date=as.Date(observed_on, format="%Y-%m-%d")) %>% select(-observed_on) %>%
-    select(-place_country_name)  # not really useful
+    mutate(date=as.Date(observed_on, format="%Y-%m-%d")) %>% select(-observed_on) # %>%
+    # select(-place_country_name)  # not really useful
 
 # 2
 mivi_young <- read.csv("MIVI-YOUNG.csv") %>%
@@ -265,6 +265,9 @@ rm(a, b, res)
 ## Tables
 
 ```{R}
+# All observations by country
+table1(~ place_country_name, data=mivi_all %>% mutate(stage=addNA(stage)))
+
 table1(~ latitude + longitude + elevation + julian | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
 ```
 
