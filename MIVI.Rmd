@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 # Japanese Stiltgrass (Microstegium vimineum)
-# Effects of Latitude and Elevation on Seeding Time
+# Effects of Latitude and Elevation on the Phenology of an Invasive Grass
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
 Total observations (NA): 14,992<br/>  
@@ -66,7 +66,7 @@ mivi_flowering <- mivi_flowering %>% left_join(mivi_all, by="id")
 
 # 4
 mivi_fruiting <- read.csv("./MIVI-FRUITING.csv") %>%
-    mutate(stage="Seeding")
+    mutate(stage="Fruiting")
 
 
 # join each based on id
@@ -97,7 +97,7 @@ mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j"))
 
 # make phenology a factor type (not necessary)
 mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE,
-                         levels=c("Vegetation", "Flowering", "Seeding"))
+                         levels=c("Vegetation", "Flowering", "Fruiting"))
 
 # Select only observations with phenology data
 mivi_annotated <- mivi_all %>% filter(!is.na(stage))
@@ -127,7 +127,7 @@ ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
     ylab("count") + labs(title="Histogram of observations by latitude")
 
 # Boxplots of phenology by quartile (notches break hinges for Flowering)
-# Slight earlier trend in Seeding visible
+# Slight earlier trend in Fruiting visible
 ggplot(mivi_annotated, aes(julian, stage)) + geom_boxplot() + facet_grid(~group) +
     coord_flip() + xlab("Julian day") + labs(title="Phenology stage, quartiles by latitude")
 ```
@@ -182,8 +182,8 @@ write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 
 ```{R}
 # Note: returns Inf if there are none in the selection
-first_seed <- function(df) {
-    df <- df %>% filter(stage == "Seeding")
+first_fruit <- function(df) {
+    df <- df %>% filter(stage == "Fruiting")
     return (min(df$julian, na.rm=TRUE))
 }
 ```
@@ -195,22 +195,22 @@ first_seed <- function(df) {
 mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
 
 # mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(mlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
+a <- mivi_annotated %>% group_by(group) %>% summarise(medlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
 
-# first seeding date in each group
-b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
+# first fruiting date in each group
+b <- mivi_annotated %>% group_by(group) %>% group_map(~first_fruit(.x))
 
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...5) %>% select(-...5)
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(firstfruit = ...5) %>% select(-...5)
 a <- remove_missing(a, finite=TRUE)  # remove any Inf's
 
 # Plot with linear model
 print(
-    ggplot(a, aes(mlat, fseed)) + geom_point() + geom_smooth(method='lm') +
-        ylab("Julian day") + xlab("mean latitude") + labs(title="First Seeding Day by Latitude")
+    ggplot(a, aes(medlat, firstfruit)) + geom_point() + geom_smooth(method='lm') +
+        ylab("Julian day") + xlab("mean latitude") + labs(title="First Fruiting Day by Latitude")
 )
 
 # Q-Q residual plot
-model_lat <- lm(fseed~mlat, data=a)
+model_lat <- lm(firstfruit~medlat, data=a)
 res <- resid(model_lat)
 qqnorm(res)
 qqline(res)
@@ -219,8 +219,8 @@ print(n)
 print(mad(res))
 
 # Pearson's correlation test
-cor.test(a$fseed, a$mlat, alternative="less")
-# cor.test(a$fseed, a$mlat, alternative="less")$estimate
+cor.test(a$firstfruit, a$medlat, alternative="less")
+# cor.test(a$firstfruit, a$medlat, alternative="less")$estimate
 
 correlation_matrix(a, use="lower")
 
@@ -237,26 +237,26 @@ rm(a, b, res, model_lat)
 mivi_annotated$group <- ntile(mivi_annotated$elevation, n)
 
 # mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(mele=mean(elevation, na.rm=TRUE))
+a <- mivi_annotated %>% group_by(group) %>% summarise(medele=mean(elevation, na.rm=TRUE))
 
-# first seeding date in each group
-b <- mivi_annotated %>% group_by(group) %>% group_map(~first_seed(.x))
+# first fruiting date in each group
+b <- mivi_annotated %>% group_by(group) %>% group_map(~first_fruit(.x))
 
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(fseed = ...3) %>% select(-...3)
+a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(firstfruit = ...3) %>% select(-...3)
 a <- remove_missing(a, finite=TRUE)  # remove any Inf's
 
 # Plot with linear model
-ggplot(a, aes(mele, fseed)) + geom_point() + geom_smooth(method='lm') +
-    ylab("Julian day") + xlab("mean elevation") + labs(title="First Seeding Day by Elevation")
+ggplot(a, aes(medele, firstfruit)) + geom_point() + geom_smooth(method='lm') +
+    ylab("Julian day") + xlab("mean elevation") + labs(title="First Fruiting Day by Elevation")
 
 # Q-Q residual plot
-model_ele <- lm(fseed~mele, data=a)
+model_ele <- lm(firstfruit~medele, data=a)
 res <- resid(model_ele)
 qqnorm(res)
 qqline(res)
 
 # Pearson's correlation test
-cor.test(a$fseed, a$mele, alternative="less")
+cor.test(a$firstfruit, a$medele, alternative="less")
 
 rm(a, b, res, model_ele)
 ```
