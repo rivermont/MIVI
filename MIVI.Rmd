@@ -1,12 +1,12 @@
 ---
 title: "MIVI"
 author: "Will Bennett"
-date: "12/10/2023"
+date: "12/13/2023"
 output: pdf_document
 ---
 
-# Japanese Stiltgrass (Microstegium vimineum)
 # Effects of Latitude and Elevation on the Phenology of an Invasive Grass
+## Japanese Stiltgrass (Microstegium vimineum)
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
 Total observations (NA): 14,992<br/>  
@@ -169,6 +169,7 @@ mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
 
 rm(coords, elevations)
 
+mivi_annotated <- mivi_all %>% filter(!is.na(stage))
 write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 ```
 
@@ -319,7 +320,10 @@ rm(data, model_ele, res)
 
 ```{R}
 # All observations by country
-table1(~ place_country_name, data=mivi_all %>% mutate(stage=addNA(stage)))
+table1(~ place_country_name, data=mivi_all)
+
+# All observations by state (includes Ontario)
+table1(~ place_state_name, data=mivi_all)
 
 table1(~ latitude + longitude + elevation + julian + place_country_name | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
 ```
