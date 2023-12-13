@@ -24,9 +24,6 @@ library(elevatr)
 library(corrtable)
 library(table1)
 library(knitr)
-
-# number of groups for analysis
-n = 185
 ```
 
 
@@ -160,8 +157,6 @@ ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) 
 # Retrieve Elevation Information
 
 ```{R, eval=FALSE}
-# TODO: replace elevation value with value from 'field:elevation (feet)'
-
 coords <- data.frame(x=mivi_annotated$longitude,
                      y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
 # pipe to 'slice(1:100)' to get a subset for reducing retrieval time
@@ -184,81 +179,140 @@ write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 # Note: returns Inf if there are none in the selection
 first_fruit <- function(df) {
     df <- df %>% filter(stage == "Fruiting")
-    return (min(df$julian, na.rm=TRUE))
+    if(nrow(df)==0) {return (Inf)}
+    return (min(df$julian))
 }
 ```
 
 ## Latitude
 
 ```{R}
-# Create groups
-mivi_annotated$group <- ntile(mivi_annotated$latitude, n)
+get_lat_quants <- function(df, n) {
+    # create groups
+    df$group <- ntile(df$latitude, n)
+    
+    # calculate latitude variables for each group
+    a <- df %>% group_by(group) %>% summarize(avglat=mean(latitude),
+                                              minlat=min(latitude),
+                                              maxlat=max(latitude))
+    
+    # first fruiting date in each group
+    b <- df %>% group_by(group) %>% group_map(~first_fruit(.x))
+    
+    a <- bind_cols(a, do.call(rbind.data.frame, b)[,1], .name_repair = "unique_quiet") %>%
+        mutate(firstfruit = ...5) %>% select(-...5)
+    a <- remove_missing(a, finite=TRUE, na.rm=TRUE)  # remove any Inf's
+    
+    return (a)
+}
 
-# mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(medlat=mean(latitude, na.rm=TRUE), minlat=min(latitude, na.rm=TRUE), maxlat=max(latitude, na.rm=TRUE))
+# Loop to determine best quantile amount for correlation
+quants = data.frame()
 
-# first fruiting date in each group
-b <- mivi_annotated %>% group_by(group) %>% group_map(~first_fruit(.x))
+for(i in 10:300) {
+    # print(i)
+    a <- get_lat_quants(mivi_annotated, i)
+    quants <- rbind(quants, data.frame(i, cor(a$firstfruit, a$avglat)))
+}
+rm(i, a)
 
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(firstfruit = ...5) %>% select(-...5)
-a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+colnames(quants) <- c("n quantiles", "correlation")
+plot(quants)
 
-# Plot with linear model
+y <- which.min(quants$corr)
+n <- quants[y,1]  # select n with strongest correlation
+paste0("n quantiles for best correlation is: ", n)
+
+rm(quants, y)
+
+
+# Latitude linear model
+data <- get_lat_quants(mivi_annotated, n)
+model_lat <- lm(firstfruit~avglat, data=data)
+
+# Plot linear model
 print(
-    ggplot(a, aes(medlat, firstfruit)) + geom_point() + geom_smooth(method='lm') +
+    ggplot(data, aes(avglat, firstfruit)) + geom_point() + geom_smooth(method='lm') +
         ylab("Julian day") + xlab("mean latitude") + labs(title="First Fruiting Day by Latitude")
 )
 
 # Q-Q residual plot
-model_lat <- lm(firstfruit~medlat, data=a)
 res <- resid(model_lat)
 qqnorm(res)
 qqline(res)
 
-print(n)
-print(mad(res))
+paste0("Average absolute residual: ", format(mad(res), digits=6))
 
 # Pearson's correlation test
-cor.test(a$firstfruit, a$medlat, alternative="less")
-# cor.test(a$firstfruit, a$medlat, alternative="less")$estimate
+cor.test(data$firstfruit, data$avglat, alternative="less")
 
-correlation_matrix(a, use="lower")
+correlation_matrix(data, use="lower")
 
-kable(correlation_matrix(a, use="lower"), booktabs=TRUE, format="latex")
-# kable(correlation_matrix(a, use="lower"), booktabs=TRUE)
+# kable(correlation_matrix(data, use="lower"), booktabs=TRUE, format="latex")
+# kable(correlation_matrix(data, use="lower"), booktabs=TRUE)
 
-rm(a, b, res, model_lat)
+rm(data, model_lat, res)
 ```
 
 ## Elevation
 
 ```{R}
-# Create groups
-mivi_annotated$group <- ntile(mivi_annotated$elevation, n)
+get_ele_quants <- function(df, n) {
+    # Create groups
+    df$group <- ntile(mivi_annotated$elevation, n)
+    
+    # mean lat for each group
+    a <- df %>% group_by(group) %>% summarize(avgele=mean(elevation))
+    
+    # first fruiting date in each group
+    b <- df %>% group_by(group) %>% group_map(~first_fruit(.x))
+    
+    a <- bind_cols(a, do.call(rbind.data.frame, b)[,1], .name_repair = "unique_quiet") %>%
+        mutate(firstfruit = ...3) %>% select(-...3)
+    a <- remove_missing(a, finite=TRUE, na.rm=TRUE)  # remove any Inf's
+    
+    return (a)
+}
 
-# mean lat for each group
-a <- mivi_annotated %>% group_by(group) %>% summarise(medele=mean(elevation, na.rm=TRUE))
+# Loop to determine best quantile amount for correlation
+quants = data.frame()
 
-# first fruiting date in each group
-b <- mivi_annotated %>% group_by(group) %>% group_map(~first_fruit(.x))
+for(i in 10:300) {
+    # print(i)
+    a <- get_ele_quants(mivi_annotated, i)
+    quants <- rbind(quants, data.frame(i, cor(a$firstfruit, a$avgele)))
+}
+rm(i, a)
 
-a <- bind_cols(a, do.call(rbind.data.frame, b)[,1]) %>% mutate(firstfruit = ...3) %>% select(-...3)
-a <- remove_missing(a, finite=TRUE)  # remove any Inf's
+colnames(quants) <- c("n quantiles", "correlation")
+plot(quants)
 
-# Plot with linear model
-ggplot(a, aes(medele, firstfruit)) + geom_point() + geom_smooth(method='lm') +
+y <- which.min(quants$corr)
+n <- quants[y,1]  # select n with strongest correlation
+paste0("n quantiles for best correlation is: ", n)
+
+rm(quants, y)
+
+
+# Elevation linear model
+data = get_ele_quants(mivi_annotated, n)
+model_ele <- lm(firstfruit~avgele, data=data)
+
+# Plot linear model
+ggplot(data, aes(avgele, firstfruit)) + geom_point() + geom_smooth(method='lm') +
     ylab("Julian day") + xlab("mean elevation") + labs(title="First Fruiting Day by Elevation")
 
 # Q-Q residual plot
-model_ele <- lm(firstfruit~medele, data=a)
 res <- resid(model_ele)
 qqnorm(res)
 qqline(res)
 
-# Pearson's correlation test
-cor.test(a$firstfruit, a$medele, alternative="less")
+paste0("Average absolute residual: ", format(mad(res), digits=6))
 
-rm(a, b, res, model_ele)
+# Pearson's correlation test
+cor.test(data$firstfruit, data$avgele, alternative="less")
+
+rm(data, model_ele, res)
 ```
 
 ## Tables
