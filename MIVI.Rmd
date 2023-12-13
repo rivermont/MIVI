@@ -8,9 +8,9 @@ output: pdf_document
 # Effects of Latitude and Elevation on the Phenology of an Invasive Grass
 ## Japanese Stiltgrass (Microstegium vimineum)
 
-Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))<br/>  
-Total observations (NA): 14,992<br/>  
-Observations needing phenology annotation: 8,316
+Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))  
+Total observations (North America): 13,782  
+Observations needing phenology annotation: 5,940 ([link for reviewing](https://www.inaturalist.org/observations/identify?reviewed=any&quality_grade=research&order_by=random&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&without_term_id=12))
 
 ### Setup
 
@@ -117,10 +117,11 @@ ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
 
 # Histogram with city labels
 ggplot(mivi_all, aes(x=latitude)) + geom_histogram(binwidth=0.2) +
-    geom_vline(xintercept=33.75) + annotate("text", x=33.5, y=850, label="Atlanta", angle=90) +
-    geom_vline(xintercept=35.84) + annotate("text", x=35.59, y=850, label="Raleigh", angle=90) +
-    geom_vline(xintercept=38.9) + annotate("text", x=38.65, y=850, label="Washington", angle=90) +
-    geom_vline(xintercept=40.75) + annotate("text", x=41, y=850, label="New York", angle=90) +
+    geom_vline(xintercept=33.75) + annotate("text", x=33.5, y=900, label="Atlanta", angle=90) +
+    geom_vline(xintercept=35.84) + annotate("text", x=35.59, y=900, label="Raleigh", angle=90) +
+    geom_vline(xintercept=37.54) + annotate("text", x=37.29, y=900, label="Richmond", angle=90) +
+    geom_vline(xintercept=38.9) + annotate("text", x=38.65, y=900, label="Washington", angle=90) +
+    geom_vline(xintercept=40.75) + annotate("text", x=41, y=900, label="New York", angle=90) +
     ylab("count") + labs(title="Histogram of observations by latitude")
 
 # Boxplots of phenology by quartile (notches break hinges for Flowering)
