@@ -83,7 +83,27 @@ mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X) %>%
     mutate(date=as.Date(date, format="%Y-%m-%d"))
 ```
 
-## Data processing
+
+# Retrieve Elevation Information
+
+```{R, eval=FALSE}
+coords <- data.frame(x=mivi_annotated$longitude,
+                     y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
+# pipe to 'slice(1:100)' to get a subset for reducing retrieval time
+
+# retrieve elevation from USGS (takes a while)
+elevations <- get_elev_point(coords, prj=4326, src="epqs")
+
+mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
+    select(-elev_units, -geometry)
+
+rm(coords, elevations)
+
+write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
+```
+
+
+# Data processing
 
 ```{R}
 # remove known incorrect records
@@ -101,6 +121,19 @@ mivi_annotated <- mivi_all %>% filter(!is.na(stage))
 
 # Group into quartiles by latitude
 mivi_annotated$group <- ntile(mivi_annotated$latitude, 4)
+```
+
+
+# Descriptive Tables
+
+```{R}
+# All observations by country
+table1(~ place_country_name, data=mivi_all)
+
+# All observations by state (includes Ontario)
+table1(~ place_state_name, data=mivi_all)
+
+table1(~ latitude + longitude + elevation + julian + place_country_name | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
 ```
 
 
@@ -152,26 +185,6 @@ timeclip <- c(as.Date("2019-02-01"), as.Date("2023-11-30"))
 ggplot(mivi_all, aes(date, latitude)) + geom_point(aes(color=stage), alpha=0.5) +
     scale_x_date(limits=timeclip, date_breaks = "1 year", date_labels = "%Y") + scale_color_hue() +
     labs(title="Observations by latitude over time (2019-2023)")
-```
-
-
-# Retrieve Elevation Information
-
-```{R, eval=FALSE}
-coords <- data.frame(x=mivi_annotated$longitude,
-                     y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
-# pipe to 'slice(1:100)' to get a subset for reducing retrieval time
-
-# retrieve elevation from USGS (takes a while)
-elevations <- get_elev_point(coords, prj=4326, src="epqs")
-
-mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
-    select(-elev_units, -geometry)
-
-rm(coords, elevations)
-
-mivi_annotated <- mivi_all %>% filter(!is.na(stage))
-write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
 ```
 
 
@@ -316,19 +329,6 @@ cor.test(data$firstfruit, data$avgele, alternative="less")
 
 rm(data, model_ele, res)
 ```
-
-## Tables
-
-```{R}
-# All observations by country
-table1(~ place_country_name, data=mivi_all)
-
-# All observations by state (includes Ontario)
-table1(~ place_state_name, data=mivi_all)
-
-table1(~ latitude + longitude + elevation + julian + place_country_name | stage, data=mivi_all %>% mutate(stage=addNA(stage)))
-```
-
 
 <!--
 data <- data.frame("category" = c('Annotated', 'Not Annotated'), "amount" = c(2952, 12066))

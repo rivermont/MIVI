@@ -67,14 +67,6 @@ mivi_all <- rbind(mivi_all, mivi_flowering)
 
 rm(mivi_young, mivi_flowering, mivi_fruiting)
 
-# Data processing
-mivi_all <- subset(mivi_all, id != "130398055")
-
-mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j")))
-
-mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE,
-                         levels=c("Vegetation", "Flowering", "Fruiting"))
-
 # Retrieve elevations
 coords <- data.frame(x=mivi_annotated$longitude,
                      y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
@@ -87,6 +79,14 @@ mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
 rm(coords, elevations)
 
 write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
+
+# Data processing
+mivi_all <- subset(mivi_all, id != "130398055")
+
+mivi_all <- mivi_all %>% mutate(julian = as.integer(strftime(date, format="%j")))
+
+mivi_all$stage <- factor(mivi_all$stage, ordered=TRUE,
+                         levels=c("Vegetation", "Flowering", "Fruiting"))
 
 mivi_annotated <- mivi_all %>% filter(!is.na(stage))
 
