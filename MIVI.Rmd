@@ -1,7 +1,7 @@
 ---
 title: "MIVI"
 author: "Will Bennett"
-date: "12/13/2023"
+date: "12/14/2023"
 output: pdf_document
 ---
 
@@ -10,7 +10,7 @@ output: pdf_document
 
 Data source: iNaturalist ([link](https://www.inaturalist.org/taxa/116710-Microstegium-vimineum))  
 Total observations (North America): 13,782  
-Observations needing phenology annotation: 5,940 ([link for reviewing](https://www.inaturalist.org/observations/identify?reviewed=any&quality_grade=research&order_by=random&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&without_term_id=12))
+Observations needing phenology annotation: 5,270 ([link for reviewing](https://www.inaturalist.org/observations/identify?reviewed=any&quality_grade=research&order_by=random&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&without_term_id=12))
 
 ### Setup
 
@@ -38,7 +38,7 @@ library(knitr)
 [Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=21)
 
 2. Export all _M. vimineum_ observations with phenology 'Flowering' with column `id`:
-[Link](https://www.inaturalist.org/observations/quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=13)
+[Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=13)
 
 2. Export all _M. vimineum_ observations with phenology 'Fruiting' with column `id`:
 [Link](https://www.inaturalist.org/observations/export?quality_grade=research&identifications=any&geoprivacy=open&place_id=97394&taxon_id=116710&verifiable=true&acc_below_or_unknown=28000&term_id=12&term_value_id=14)
@@ -76,17 +76,11 @@ mivi_all <- rbind(mivi_all, mivi_flowering)
 rm(mivi_young, mivi_flowering, mivi_fruiting)
 ```
 
-### Or load from processed file
-
-```{R}
-mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X) %>%
-    mutate(date=as.Date(date, format="%Y-%m-%d"))
-```
-
-
-# Retrieve Elevation Information
+### Retrieve Elevation Information
 
 ```{R, eval=FALSE}
+mivi_annotated <- mivi_all %>% filter(!is.na(stage))
+
 coords <- data.frame(x=mivi_annotated$longitude,
                      y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
 # pipe to 'slice(1:100)' to get a subset for reducing retrieval time
@@ -100,6 +94,13 @@ mivi_all <- mivi_all %>% left_join(elevations, by=join_by("id" == "ele_id")) %>%
 rm(coords, elevations)
 
 write.csv(mivi_all, file="./MIVI-PROCESSED.csv", na='')
+```
+
+## Or load from processed file
+
+```{R}
+mivi_all <- read.csv("./MIVI-PROCESSED.csv") %>% select(-X) %>%
+    mutate(date=as.Date(date, format="%Y-%m-%d"))
 ```
 
 

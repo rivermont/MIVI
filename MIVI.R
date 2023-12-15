@@ -26,7 +26,7 @@ get_lat_quants <- function(df, n) {
     b <- df %>% group_by(group) %>% group_map(~first_fruit(.x))
     
     a <- bind_cols(a, do.call(rbind.data.frame, b)[,1], .name_repair = "unique_quiet") %>%
-        mutate(firstfruit = ...5) %>% select(-...5)
+        mutate(firstfruit = ...3) %>% select(-...3)
     a <- remove_missing(a, finite=TRUE, na.rm=TRUE)
     
     return (a)
@@ -68,6 +68,8 @@ mivi_all <- rbind(mivi_all, mivi_flowering)
 rm(mivi_young, mivi_flowering, mivi_fruiting)
 
 # Retrieve elevations
+mivi_annotated <- mivi_all %>% filter(!is.na(stage))
+
 coords <- data.frame(x=mivi_annotated$longitude,
                      y=mivi_annotated$latitude, ele_id=mivi_annotated$id)
 
