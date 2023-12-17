@@ -123,6 +123,7 @@ qqnorm(res)
 qqline(res)
 
 paste0("Average absolute residual: ", format(mad(res), digits=6))
+paste0("avglat coefficient is: ", format(coefficients(model_lat)["avglat"], digits=5))
 
 cor.test(data$firstfruit, data$avglat, alternative="less")
 
@@ -159,6 +160,7 @@ qqnorm(res)
 qqline(res)
 
 paste0("Average absolute residual: ", format(mad(res), digits=6))
+paste0("avgele coefficient is: ", format(coefficients(model_ele)["avgele"], digits=5))
 
 cor.test(data$firstfruit, data$avgele, alternative="less")
 
